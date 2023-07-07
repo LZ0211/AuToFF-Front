@@ -1,0 +1,80 @@
+apiVersion: apps/v1 
+kind: Deployment
+metadata:
+  name: autoff-frontend
+  namespace: ${NAMESPACE}
+spec:
+  selector:
+    matchLabels:
+      app: autoff-frontend
+  replicas: 1 # tells deployment to run 4 pods matching the template
+  template: # create pods using pod definition in this template
+    metadata:
+      labels:
+        app: autoff-frontend
+    spec:
+      containers:
+        - name: autoff-frontend
+          image: ${DOCKER_REGISTRY}/${APP_NAME}/${CI_PROJECT_NAME}:${IMAGE_TAG}
+          ports:
+            - containerPort: 80
+              name: server
+          envFrom:
+            - configMapRef:
+               name: config-map-env
+          imagePullPolicy: Always
+      imagePullSecrets:
+        - name: docker-secret
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: autoff-frontend
+  namespace: ${NAMESPACE}
+spec:
+  selector:
+    app: autoff-frontend
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+---
+apiVersion: networking.k8s.io/v1
+#apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: autoff-frontend
+  namespace: ${NAMESPACE}
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/use-regex: "true"
+spec:
+  tls:
+  - hosts: 
+    - autoff-${NAMESPACE}.mp.iresearch.net.cn
+    secretName: tls-${NAMESPACE}-secret 
+  rules:
+    - host: autoff-${NAMESPACE}.mp.iresearch.net.cn
+      #http:
+        #paths:
+          #- backend:
+              #serviceName: autoff-frontend
+              #servicePort: 80
+      http:
+        paths:
+        - path: /
+          pathType: Prefix
+          backend:
+              service:
+                name: autoff-frontend
+                port:
+                  number: 80
+        - path: /api$
+          pathType: Prefix
+          backend:
+              service:
+                name: ai-autoff
+                port:
+                  number: 5000
+
+
